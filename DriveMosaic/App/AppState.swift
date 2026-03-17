@@ -93,6 +93,9 @@ final class AppState {
         collectorItems.append(CollectorItem(from: node))
     }
 
+    /// Number of items that failed to delete in the last operation
+    var lastDeleteFailCount: Int = 0
+
     /// Move all collector items to Trash (Pro feature)
     func deleteCollectorItems() {
         guard licenseManager.isPro else {
@@ -101,17 +104,22 @@ final class AppState {
         }
 
         var deletedPaths: [String] = []
+        var failedItems: [CollectorItem] = []
+
         for item in collectorItems {
             let url = URL(fileURLWithPath: item.path)
             do {
                 try FileManager.default.trashItem(at: url, resultingItemURL: nil)
                 deletedPaths.append(item.path)
             } catch {
-                // Skip items that fail to delete
+                // Keep failed items in the collector so user can see what didn't work
+                failedItems.append(item)
             }
         }
 
-        collectorItems.removeAll()
+        // Only remove successfully deleted items; keep failures visible
+        collectorItems = failedItems
+        lastDeleteFailCount = failedItems.count
 
         // Re-scan to update the tree if we deleted anything
         if !deletedPaths.isEmpty, let root = scanRoot {
